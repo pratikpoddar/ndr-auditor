@@ -1,0 +1,33 @@
+# Template for shopify.app.toml.
+#
+# Named `shopify.app.toml.example`, NOT `shopify.app.example.toml`, on purpose: the Shopify
+# CLI globs `shopify.app*.toml` and will happily adopt a file named the second way as your
+# real config, then write your live client_id into it. Which is exactly what happened once.
+#
+# Setup:
+#   cp shopify.app.toml.example shopify.app.toml
+#   npx shopify app config link
+#
+# The scope and webhook choices below are product decisions, not boilerplate — keep them in
+# sync here when you change them, since this file is what a new contributor starts from.
+
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = ""
+name = "NDR Auditor"
+application_url = "https://example.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2026-10"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_fulfillments,read_orders,write_fulfillments"
+
+[auth]
+redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]

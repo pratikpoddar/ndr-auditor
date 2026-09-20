@@ -30,7 +30,7 @@ Low-confidence (staleness-only) findings are excluded from the headline RTO rate
 ```bash
 docker compose up -d
 cp .env.example .env
-cp shopify.app.example.toml shopify.app.toml   # then: npx shopify app config link
+cp shopify.app.toml.example shopify.app.toml    # then: npx shopify app config link
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"  # -> APP_ENCRYPTION_KEY
 npx prisma db push
 npm run seed      # 500-order demo store with realistic Indian courier data

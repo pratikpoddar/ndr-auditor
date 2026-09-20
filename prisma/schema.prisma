@@ -1,0 +1,364 @@
+// NDR Auditor — canonical stored model.
+// Ingestion (Shopify facts) is kept strictly separate from derivation (incidents,
+// scorecards) so inference can be re-run under a new rule version without re-fetching.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Shopify session storage (required by @shopify/shopify-app-session-storage-prisma)
+// ---------------------------------------------------------------------------
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+}
+
+// ---------------------------------------------------------------------------
+// Tenant
+// ---------------------------------------------------------------------------
+
+model Shop {
+  id           String    @id @default(cuid())
+  domain       String    @unique // myshopifyDomain
+  name         String?
+  currency     String    @default("INR")
+  timezone     String    @default("Asia/Kolkata")
+  installedAt  DateTime  @default(now())
+  uninstalledAt DateTime?
+  scopes       String?
+  apiVersion   String?
+  plan         String    @default("founding")
+
+  // Settings (spec 4.1 setup screen)
+  auditWindowDays   Int      @default(90)
+  codGatewayRules   String[] @default(["cash on delivery (cod)", "cod", "cash_on_delivery", "manual"])
+  riskValueBasis    String   @default("ORDER_VALUE") // ORDER_VALUE | COD_COLLECTABLE
+  staleOfdHours     Int      @default(36)
+  staleNoEventDays  Int      @default(10)
+  whatsappConfig    Json?
+  quietHoursStart   Int      @default(21) // shop-local hour
+  quietHoursEnd     Int      @default(8)
+
+  // Backfill observability
+  backfillState     String   @default("PENDING") // PENDING|RUNNING|DONE|FAILED
+  backfillCursor    String?
+  backfillCoverageFrom DateTime?
+  backfillOrdersSeen   Int   @default(0)
+  hasReadAllOrders     Boolean @default(false)
+
+  orders       OrderFact[]
+  shipments    Shipment[]
+  incidents    NDRIncident[]
+  scorecards   CourierScorecard[]
+  hygiene      TrackingHygieneReport[]
+  jobs         Job[]
+  receipts     WebhookReceipt[]
+  writeLogs    ShopifyWriteLog[]
+
+  @@index([domain])
+}
+
+// ---------------------------------------------------------------------------
+// Ingested facts
+// ---------------------------------------------------------------------------
+
+model OrderFact {
+  id             String   @id @default(cuid())
+  shopId         String
+  shop           Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shopifyOrderId String
+  orderName      String
+  createdAt      DateTime
+  updatedAt      DateTime
+  value          Decimal  @db.Decimal(14, 2)
+  currency       String
+  paymentMode    String   // COD | PREPAID | UNKNOWN
+  gatewayNames   String[] @default([])
+  pincode        String?  // full pincode, used only for exact joins
+  pincodePrefix  String?  // 3-digit, used for display/cuts
+  city           String?
+  provinceCode   String?
+  countryCode    String?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  financialStatus String?
+  refundAmount   Decimal  @default(0) @db.Decimal(14, 2)
+  lastRefundAt   DateTime?
+  tags           String[] @default([])
+
+  items      OrderItemFact[]
+  shipments  Shipment[]
+
+  @@unique([shopId, shopifyOrderId])
+  @@index([shopId, createdAt])
+}
+
+model OrderItemFact {
+  id                String    @id @default(cuid())
+  orderId           String
+  order             OrderFact @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lineItemId        String
+  sku               String?
+  title             String?
+  productId         String?
+  variantId         String?
+  quantity          Int
+  attributableValue Decimal   @db.Decimal(14, 2)
+
+  @@unique([orderId, lineItemId])
+  @@index([orderId])
+}
+
+model Shipment {
+  id             String    @id @default(cuid())
+  shopId         String
+  shop           Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  orderId        String
+  order          OrderFact @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fulfillmentId  String
+
+  carrierRaw        String?
+  carrierNormalized String?  // slug from the alias table, or null when unrecognized
+  awb               String?
+  trackingUrl       String?
+
+  currentStatus  String    // normalized shipment status (see lib/normalize.ts)
+  rawStatus      String?   // Shopify displayStatus/status as received
+  firstShippedAt DateTime?
+  lastEventAt    DateTime?
+  deliveredAt    DateTime?
+  trackable      Boolean   @default(false)
+  sourceUpdatedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  events    ShipmentEvent[]
+  incidents NDRIncident[]
+
+  @@unique([shopId, fulfillmentId])
+  @@index([shopId, currentStatus])
+  @@index([shopId, carrierNormalized])
+  @@index([shopId, awb])
+}
+
+model ShipmentEvent {
+  id            String   @id @default(cuid())
+  shipmentId    String
+  shipment      Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  // Deterministic hash when Shopify exposes no stable event ID — keeps re-ingest idempotent.
+  sourceEventId String
+  status        String
+  rawStatus     String?
+  happenedAt    DateTime
+  city          String?
+  province      String?
+  message       String?
+  ingestionSource String @default("SHOPIFY") // SHOPIFY | SEED
+
+  @@unique([shipmentId, sourceEventId])
+  @@index([shipmentId, happenedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Derived: incidents and outcomes
+// ---------------------------------------------------------------------------
+
+model NDRIncident {
+  id           String   @id @default(cuid())
+  shopId       String
+  shop         Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shipmentId   String
+  shipment     Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  openedAt       DateTime
+  triggerEventId String?
+  openRule       String   // N1..N4
+  reasonClass    String   // see inference/reasons.ts
+  reasonEvidence String?  // the matched snippet, verbatim
+  confidence     Float
+  confidenceBand String   // HIGH | MEDIUM | LOW
+  evidence       Json     // { rule, ruleVersion, matched, eventIds, notes }
+  ruleVersion    String
+
+  state        String   @default("NDR_OPEN")
+  rtoLevel     String   @default("NONE") // CONFIRMED|HIGH|MEDIUM|LOW|NOT_RTO|NONE
+  rtoRule      String?
+  riskValue    Decimal  @db.Decimal(14, 2)
+  actionDueAt  DateTime?
+  recomputedAt DateTime @default(now())
+
+  // Recovery
+  recoveryTokenHash String?  @unique
+  tokenExpiresAt    DateTime?
+  contactedAt       DateTime?
+  buyerIntent       String?
+  outcomes          RecoveryOutcome[]
+  alerts            AlertLog[]
+  responses         BuyerResponse[]
+
+  @@unique([shipmentId, openedAt])
+  @@index([shopId, state])
+  @@index([shopId, openedAt])
+}
+
+model BuyerResponse {
+  id          String      @id @default(cuid())
+  incidentId  String
+  incident    NDRIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  action      String      // REATTEMPT | ADDRESS_CORRECTION | ALREADY_RECEIVED | REFUSED | NEED_HELP
+  payload     Json?       // corrected address fields, encrypted at rest in production
+  respondedAt DateTime    @default(now())
+  clientHash  String?     // hash(ip + user-agent), never the raw values
+
+  @@index([incidentId])
+}
+
+model RecoveryOutcome {
+  id            String      @id @default(cuid())
+  incidentId    String
+  incident      NDRIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  outcome       String      // RECOVERED | NATURALLY_RESOLVED | RTO | UNRESOLVED | WRONG_ALERT
+  outcomeAt     DateTime    @default(now())
+  evidenceType  String      // AUTO_DELIVERED_EVENT | MERCHANT_LABEL | BUYER_LABEL
+  actor         String      @default("system")
+  finalStatus   String?
+  realizedValue Decimal     @default(0) @db.Decimal(14, 2)
+  note          String?
+
+  @@index([incidentId])
+}
+
+model AlertLog {
+  id          String      @id @default(cuid())
+  incidentId  String
+  incident    NDRIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  channel     String      // WHATSAPP_MERCHANT | WHATSAPP_BUYER | CONSOLE
+  dedupeKey   String      @unique
+  status      String      // QUEUED | SENT | FAILED | SUPPRESSED_QUIET_HOURS
+  providerId  String?
+  providerResponse Json?
+  error       String?
+  sentAt      DateTime?
+  createdAt   DateTime    @default(now())
+
+  @@index([incidentId])
+}
+
+// ---------------------------------------------------------------------------
+// Derived: rollups
+// ---------------------------------------------------------------------------
+
+model CourierScorecard {
+  id          String   @id @default(cuid())
+  shopId      String
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  windowStart DateTime
+  windowEnd   DateTime
+  carrier     String   // normalized slug or "unknown"
+  shipped     Int
+  trackable   Int
+  attempted   Int
+  failed      Int
+  inferredRtoHigh   Int
+  inferredRtoMedium Int
+  delivered   Int
+  medianDeliveryDays Float?
+  valueAtRisk Decimal  @db.Decimal(14, 2)
+  computedAt  DateTime @default(now())
+
+  @@unique([shopId, windowStart, windowEnd, carrier])
+}
+
+model TrackingHygieneReport {
+  id                 String   @id @default(cuid())
+  shopId             String
+  shop               Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  windowStart        DateTime
+  windowEnd          DateTime
+  totalFulfillments  Int
+  missingAwb         Int
+  missingCarrier     Int
+  unrecognizedCarrier Int
+  duplicateAwb       Int
+  invalidUrl         Int
+  staleTracking      Int
+  score              Float
+  computedAt         DateTime @default(now())
+
+  @@unique([shopId, windowStart, windowEnd])
+}
+
+// ---------------------------------------------------------------------------
+// Infrastructure: durable queue, webhook idempotency, write audit
+// ---------------------------------------------------------------------------
+
+model Job {
+  id          String   @id @default(cuid())
+  shopId      String?
+  shop        Shop?    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  kind        String   // BACKFILL_PAGE | NORMALIZE_FULFILLMENT | RECOMPUTE | SEND_ALERT
+  payload     Json
+  // Set for jobs that must not be enqueued twice (e.g. one per fulfillment webhook).
+  dedupeKey   String?  @unique
+  state       String   @default("QUEUED") // QUEUED|RUNNING|DONE|FAILED
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(5)
+  runAfter    DateTime @default(now())
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([state, runAfter])
+  @@index([shopId, kind])
+}
+
+model WebhookReceipt {
+  id           String   @id @default(cuid())
+  shopId       String?
+  shop         Shop?    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  webhookId    String   @unique // X-Shopify-Webhook-Id
+  topic        String
+  shopDomain   String
+  checksum     String
+  receivedAt   DateTime @default(now())
+  // Raw payloads are debugging-only and purged on a 7-day schedule.
+  rawPayload   String?
+  purgeAfter   DateTime
+
+  @@index([purgeAfter])
+}
+
+model ShopifyWriteLog {
+  id          String   @id @default(cuid())
+  shopId      String
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  mutation    String
+  targetId    String
+  beforeValue Json
+  afterValue  Json
+  actor       String
+  succeeded   Boolean
+  error       String?
+  createdAt   DateTime @default(now())
+
+  @@index([shopId, createdAt])
+}

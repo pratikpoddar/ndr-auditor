@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ndr
+      POSTGRES_PASSWORD: ndr
+      POSTGRES_DB: ndrauditor
+    ports: ["5432:5432"]
+    volumes: ["ndr_pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ndr -d ndrauditor"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  ndr_pgdata:

@@ -7,7 +7,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { RTO_LABEL } from "../lib/inference/engine";
 import { REASON_LABEL, type ReasonClass } from "../lib/inference/reasons";
-import { formatINR } from "../lib/metrics";
+import { formatMoney, formatDateTime } from "../lib/metrics";
 import { carrierLabel } from "../lib/carriers";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -33,10 +33,7 @@ export default function ShipmentTimeline() {
   const incident = shipment.incidents[0];
   const evidence = incident?.evidence as any;
 
-  const fmt = (iso: string) =>
-    new Intl.DateTimeFormat("en-IN", {
-      dateStyle: "medium", timeStyle: "short", timeZone: timezone,
-    }).format(new Date(iso));
+  const fmt = (iso: string) => formatDateTime(iso, timezone, currency);
 
   return (
     <Page
@@ -63,7 +60,7 @@ export default function ShipmentTimeline() {
                 Reason: <b>{REASON_LABEL[incident.reasonClass as ReasonClass]}</b>
                 {incident.reasonEvidence && <> — matched phrase “{incident.reasonEvidence}”</>}
               </Text>
-              <Text as="p" tone="subdued">Risk value: {formatINR(Number(incident.riskValue), currency)} · opened {fmt(incident.openedAt as unknown as string)}</Text>
+              <Text as="p" tone="subdued">Risk value: {formatMoney(Number(incident.riskValue), currency)} · opened {fmt(incident.openedAt as unknown as string)}</Text>
 
               <Divider />
               <Text as="h3" variant="headingSm">How this label was derived</Text>

@@ -56,7 +56,27 @@ moves large numbers of shipments between confidence bands is visible immediately
 arrive in a different shape from the one the Admin client speaks — which is exactly what happened
 on first link, when the CLI wrote 2026-10 against a client that only spoke 2025-10.
 
-Confirm every field in `app/lib/shopify/queries.ts` exists in that version's schema — fulfillment **event** shape is the most likely to differ. If a
+**Already verified against a live store at 2026-10** (tinkerer dev store, 2026-09-20):
+
+| Document | Result |
+|----------|--------|
+| `SHOP_QUERY` | valid; returns name, currency, ianaTimezone |
+| `ORDERS_PAGE_QUERY` | valid, **including `fulfillments`, `trackingInfo` and the `events` timeline** |
+| `FULFILLMENT_QUERY` | valid |
+| `fulfillmentTrackingInfoUpdate` | authorized once fulfillment-order write scopes were granted |
+
+Scope findings from that run:
+- `read_orders` alone covers orders, fulfillments, tracking info and fulfillment events.
+  `read_fulfillments` was requested but never granted, and is not needed — it has been dropped.
+- `write_fulfillments` does **not** authorize `fulfillmentTrackingInfoUpdate`. Shopify requires
+  `write_merchant_managed_fulfillment_orders` / `write_third_party_fulfillment_orders` /
+  `write_assigned_fulfillment_orders`. The first two are now requested, covering both
+  self-fulfilled and aggregator-created (Shiprocket, Delhivery) shipments.
+
+Still to confirm on a store with real Indian courier data: that the event `message` field is
+actually populated, since the entire reason dictionary depends on it.
+
+Confirm every remaining field in `app/lib/shopify/queries.ts` exists in that version's schema — fulfillment **event** shape is the most likely to differ. If a
 field is absent, delete it from the query rather than defending against it downstream.
 
 ## Go / no-go thresholds

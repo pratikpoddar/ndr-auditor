@@ -36,7 +36,10 @@ export function isExpired(expiresAt: Date | null | undefined, now = new Date()):
   return expiresAt.getTime() <= now.getTime();
 }
 
-export function recoveryUrl(token: string, appUrl = process.env.SHOPIFY_APP_URL ?? ""): string {
+export function recoveryUrl(
+  token: string,
+  appUrl = process.env.SHOPIFY_APP_URL || process.env.APP_URL || "",
+): string {
   return `${appUrl.replace(/\/$/, "")}/r/${token}`;
 }
 

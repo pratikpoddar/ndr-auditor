@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rate, median, rankByLeakage, finalizeRows, emptyRow, formatINR, MIN_SAMPLE } from "../app/lib/metrics";
+import { rate, median, rankByLeakage, finalizeRows, emptyRow, formatMoney, formatCount, localeForCurrency, MIN_SAMPLE } from "../app/lib/metrics";
 import { inQuietHours, renderMerchantAlert } from "../app/lib/alerts/whatsapp.server";
 import { REASON } from "../app/lib/inference/reasons";
 
@@ -50,9 +50,33 @@ describe("low-volume suppression", () => {
   });
 });
 
-describe("formatINR", () => {
-  it("formats in the Indian numbering system", () => {
-    expect(formatINR(153698)).toContain("1,53,698");
+describe("money formatting follows the shop's currency", () => {
+  it("uses lakh grouping for INR", () => {
+    expect(formatMoney(153698, "INR")).toContain("1,53,698");
+  });
+
+  it("uses thousands grouping for USD, not lakh", () => {
+    const usd = formatMoney(153698, "USD");
+    expect(usd).toContain("153,698");
+    expect(usd).not.toContain("1,53,698");
+    expect(usd).toContain("$");
+  });
+
+  it("picks a sane locale per currency and falls back safely", () => {
+    expect(localeForCurrency("INR")).toBe("en-IN");
+    expect(localeForCurrency("USD")).toBe("en-US");
+    expect(localeForCurrency("GBP")).toBe("en-GB");
+    expect(localeForCurrency(null)).toBe("en-US");
+    expect(localeForCurrency("ZZZ")).toBe("en-US");
+  });
+
+  it("still renders something truthful for an unknown ISO code", () => {
+    expect(formatMoney(1000, "ZZZ")).toContain("1,000");
+  });
+
+  it("groups plain counts the same way as money", () => {
+    expect(formatCount(153698, "INR")).toBe("1,53,698");
+    expect(formatCount(153698, "USD")).toBe("153,698");
   });
 });
 

@@ -5,6 +5,7 @@ import { toCsv } from "../lib/export/csv";
 import { RTO_LABEL } from "../lib/inference/engine";
 import { REASON_LABEL, type ReasonClass } from "../lib/inference/reasons";
 import { maskAwb } from "../lib/normalize";
+import { formatDateTime } from "../lib/metrics";
 
 /**
  * AWB evidence timeline export (spec 4.7).
@@ -25,8 +26,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     },
   });
 
-  const fmt = (d: Date | null) =>
-    d ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: shop.timezone }).format(d) : "";
+  const fmt = (d: Date | null) => (d ? formatDateTime(d, shop.timezone, shop.currency) : "");
 
   const rows: unknown[][] = [
     ["NDR Auditor — evidence timeline"],

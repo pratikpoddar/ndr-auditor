@@ -9,7 +9,7 @@ import prisma from "../db.server";
 import { loadAudit } from "../lib/dashboard.server";
 import type { Filters } from "../lib/dashboard.server";
 import { coverageNote } from "../lib/shop.server";
-import { formatINR, describeWindow, medianDays, type SegmentRow } from "../lib/metrics";
+import { formatMoney, formatCount, describeWindow, medianDays, type SegmentRow } from "../lib/metrics";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
@@ -50,7 +50,7 @@ export default function Dashboard() {
   const { audit, filters, coverage, backfill, timezone } = useLoaderData<typeof loader>();
   const [params, setParams] = useSearchParams();
   const h = audit.headline;
-  const windowLabel = describeWindow(new Date(h.windowFrom), new Date(h.windowTo), timezone);
+  const windowLabel = describeWindow(new Date(h.windowFrom), new Date(h.windowTo), timezone, h.currency);
 
   const setFilter = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -72,7 +72,7 @@ export default function Dashboard() {
             <Banner tone="info" title="Audit is still importing">
               <BlockStack gap="200">
                 <Text as="p">
-                  {backfill.ordersSeen.toLocaleString("en-IN")} orders scanned so far · {backfill.pendingJobs} jobs queued.
+                  {formatCount(backfill.ordersSeen, h.currency)} orders scanned so far · {backfill.pendingJobs} jobs queued.
                   Newest orders are imported first, so live exceptions are already visible below.
                 </Text>
                 <ProgressBar progress={Math.min(95, backfill.ordersSeen ? 40 + backfill.ordersSeen / 20 : 5)} size="small" />
@@ -104,24 +104,24 @@ export default function Dashboard() {
         <Layout.Section>
           <InlineStack gap="400" wrap>
             <MetricCard
-              title="Shipments" value={h.fulfillments.toLocaleString("en-IN")}
-              note={`${h.shippedOrders.toLocaleString("en-IN")} orders · ${windowLabel}`} />
+              title="Shipments" value={formatCount(h.fulfillments, h.currency)}
+              note={`${formatCount(h.shippedOrders, h.currency)} orders · ${windowLabel}`} />
             <MetricCard
               title="Tracking coverage" value={pct(h.trackingCoveragePct)}
               note={`${h.trackable} of ${h.fulfillments} shipments trackable`}
               tone={h.trackingCoveragePct !== null && h.trackingCoveragePct < 70 ? "critical" : undefined} />
             <MetricCard
-              title="Delivery exceptions" value={h.ndrCount.toLocaleString("en-IN")}
+              title="Delivery exceptions" value={formatCount(h.ndrCount, h.currency)}
               note={`${pct(h.ndrRatePct)} of ${h.fulfillments} shipments · ${h.stuckCount} stuck, investigating`} />
             <MetricCard
               title="Likely RTO" value={pct(h.rtoRatePct)}
               note={`${h.rtoHeadlineCount} of ${h.fulfillments} · high + medium confidence only`}
               badge="inferred" />
             <MetricCard
-              title="Value at risk" value={formatINR(h.valueAtRisk, h.currency)}
+              title="Value at risk" value={formatMoney(h.valueAtRisk, h.currency)}
               note={`Order value on ${h.rtoHeadlineCount} high/medium-confidence shipments`} />
             <MetricCard
-              title="Recovered value" value={formatINR(h.recoveredValue, h.currency)}
+              title="Recovered value" value={formatMoney(h.recoveredValue, h.currency)}
               note={`${h.recoveredCount} of ${h.eligibleForRecovery} eligible · ${pct(h.recoveryRatePct)}`} />
           </InlineStack>
         </Layout.Section>
@@ -232,13 +232,13 @@ function SegmentTable({ rows, currency, linkKey }: { rows: SegmentRow[]; currenc
     const md = medianDays(r);
     return [
       r.insufficientSample ? `${r.label} (insufficient sample)` : r.label,
-      r.shipped.toLocaleString("en-IN"),
+      formatCount(r.shipped, currency),
       r.shipped ? `${((r.trackable / r.shipped) * 100).toFixed(0)}%` : "—",
       r.shipped ? `${((r.ndr / r.shipped) * 100).toFixed(1)}%` : "—",
       r.shipped ? `${(((r.rtoHigh + r.rtoMedium) / r.shipped) * 100).toFixed(1)}%` : "—",
       r.shipped ? `${((r.delivered / r.shipped) * 100).toFixed(0)}%` : "—",
       md === null ? "—" : `${md}d`,
-      formatINR(r.valueAtRisk, currency),
+      formatMoney(r.valueAtRisk, currency),
     ];
   });
 

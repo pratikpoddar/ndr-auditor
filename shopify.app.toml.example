@@ -26,8 +26,17 @@ include_config_on_deploy = true
 api_version = "2026-10"
 
 [access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_fulfillments,read_orders,write_fulfillments"
+# read_orders alone covers orders, fulfillments, trackingInfo and the fulfillment event
+# timeline — verified against the live 2026-10 schema, so read_fulfillments is not requested.
+#
+# fulfillmentTrackingInfoUpdate does NOT accept write_fulfillments; Shopify requires a
+# fulfillment-order write scope. Both are requested because Indian merchants split between
+# self-fulfilled orders (merchant-managed) and aggregator-created ones such as Shiprocket or
+# Delhivery (third-party), and the carrier-name correction has to work for both.
+#
+# read_all_orders is deliberately absent: it needs Shopify approval, and the app must work
+# honestly on a 60-day window without it.
+scopes = "read_orders,write_merchant_managed_fulfillment_orders,write_third_party_fulfillment_orders"
 
 [auth]
 redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]

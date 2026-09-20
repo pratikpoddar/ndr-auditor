@@ -1,6 +1,6 @@
 import type { PrismaClient, Shop } from "@prisma/client";
 import { maskAwb } from "../normalize";
-import { formatINR } from "../metrics";
+import { formatMoney } from "../metrics";
 import { RTO_LABEL } from "../inference/engine";
 import { REASON_LABEL, type ReasonClass } from "../inference/reasons";
 import { issueRecoveryToken, recoveryUrl } from "../tokens.server";
@@ -123,13 +123,13 @@ export function renderMerchantAlert(params: {
     maskAwb(params.awb),
     `${params.statusLabel} (${REASON_LABEL[params.reason]})`,
     params.city ?? "location unknown",
-    formatINR(params.value, params.currency).replace(/^\D+/, ""),
+    formatMoney(params.value, params.currency).replace(/^\D+/, ""),
     params.link,
   ];
   const body =
     `Delivery issue on order ${templateParams[0]} (${templateParams[1]}, AWB ending ${templateParams[2]}). ` +
     `Status: ${templateParams[3]} at ${templateParams[4]}. ` +
-    `Order value: ${formatINR(params.value, params.currency)}. ` +
+    `Order value: ${formatMoney(params.value, params.currency)}. ` +
     `Open recovery: ${params.link}`;
   return { to: "", body, templateParams };
 }

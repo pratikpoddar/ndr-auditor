@@ -73,21 +73,68 @@ export function rankByLeakage(rows: SegmentRow[]): SegmentRow[] {
   });
 }
 
-export function formatINR(value: number, currency = "INR"): string {
+/**
+ * Locale is derived from the shop's currency rather than hardcoded.
+ *
+ * Digit grouping is not cosmetic: en-IN groups as 1,53,698 (lakh) and en-US as 153,698. A USD
+ * store rendered with en-IN shows "$1,53,698", which reads as a typo to an American merchant
+ * and silently undermines every number on the page.
+ */
+const CURRENCY_LOCALE: Record<string, string> = {
+  INR: "en-IN",
+  USD: "en-US",
+  GBP: "en-GB",
+  EUR: "de-DE",
+  AED: "en-AE",
+  SAR: "en-SA",
+  AUD: "en-AU",
+  CAD: "en-CA",
+  SGD: "en-SG",
+  MYR: "en-MY",
+  LKR: "en-LK",
+  BDT: "bn-BD",
+  NPR: "ne-NP",
+  PKR: "en-PK",
+};
+
+export function localeForCurrency(currency: string | null | undefined): string {
+  if (!currency) return "en-US";
+  return CURRENCY_LOCALE[currency.toUpperCase()] ?? "en-US";
+}
+
+/** Money in the shop's own currency and grouping convention. */
+export function formatMoney(value: number, currency = "INR"): string {
+  const locale = localeForCurrency(currency);
   try {
-    return new Intl.NumberFormat("en-IN", {
+    return new Intl.NumberFormat(locale, {
       style: "currency",
       currency,
       maximumFractionDigits: 0,
     }).format(value);
   } catch {
-    return `${currency} ${Math.round(value).toLocaleString("en-IN")}`;
+    // Unknown ISO code: still render something truthful rather than throwing.
+    return `${currency} ${Math.round(value).toLocaleString(locale)}`;
   }
 }
 
+/** Plain counts, grouped the same way as money so a page does not mix conventions. */
+export function formatCount(value: number, currency = "INR"): string {
+  return value.toLocaleString(localeForCurrency(currency));
+}
+
 /** Inclusive-start, exclusive-end window description used on every card. */
-export function describeWindow(from: Date, to: Date, timezone: string): string {
+export function describeWindow(from: Date, to: Date, timezone: string, currency = "INR"): string {
+  const locale = localeForCurrency(currency);
   const fmt = (d: Date) =>
-    new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: timezone }).format(d);
+    new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", year: "numeric", timeZone: timezone }).format(d);
   return `${fmt(from)} – ${fmt(to)}`;
+}
+
+/** Date+time in the shop's timezone and locale. Used on timelines and exports. */
+export function formatDateTime(d: Date | string, timezone: string, currency = "INR"): string {
+  return new Intl.DateTimeFormat(localeForCurrency(currency), {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: timezone,
+  }).format(typeof d === "string" ? new Date(d) : d);
 }

@@ -7,7 +7,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { RTO_LABEL } from "../lib/inference/engine";
 import { REASON_LABEL, type ReasonClass } from "../lib/inference/reasons";
-import { formatINR } from "../lib/metrics";
+import { formatMoney, formatDateTime } from "../lib/metrics";
 import { issueRecoveryToken, recoveryUrl } from "../lib/tokens.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -122,8 +122,7 @@ function IncidentCard({ incident, currency, timezone }: any) {
   const evidence = incident.evidence as any;
   const submit = (intent: string) =>
     fetcher.submit({ incidentId: incident.id, intent }, { method: "post" });
-  const fmt = (iso: string) =>
-    new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(iso));
+  const fmt = (iso: string) => formatDateTime(iso, timezone, currency);
 
   return (
     <Card>
@@ -139,7 +138,7 @@ function IncidentCard({ incident, currency, timezone }: any) {
             <Badge>{`${Math.round(incident.confidence * 100)}%`}</Badge>
             <Badge tone="info">{incident.state}</Badge>
           </InlineStack>
-          <Text as="span" variant="headingMd">{formatINR(Number(incident.riskValue), currency)}</Text>
+          <Text as="span" variant="headingMd">{formatMoney(Number(incident.riskValue), currency)}</Text>
         </InlineStack>
 
         <Text as="p">

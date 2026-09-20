@@ -31,6 +31,10 @@ model Session {
   locale        String?
   collaborator  Boolean?  @default(false)
   emailVerified Boolean?  @default(false)
+  // Required by @shopify/shopify-app-session-storage-prisma v11, which writes these on every
+  // session upsert to support expiring offline access tokens.
+  refreshToken        String?
+  refreshTokenExpires DateTime?
 }
 
 // ---------------------------------------------------------------------------

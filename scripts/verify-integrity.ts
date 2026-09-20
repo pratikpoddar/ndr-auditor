@@ -9,6 +9,7 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { loadAudit } from "../app/lib/dashboard.server";
+import { formatMoney } from "../app/lib/metrics";
 
 const prisma = new PrismaClient();
 const failures: string[] = [];
@@ -33,7 +34,7 @@ console.log(`  shipments          ${h.fulfillments}  (orders ${h.shippedOrders})
 console.log(`  tracking coverage  ${h.trackingCoveragePct}%  ${h.trackable}/${h.fulfillments}`);
 console.log(`  NDR                ${h.ndrCount} (${h.ndrRatePct}%)   stuck/investigate ${h.stuckCount}`);
 console.log(`  headline RTO       ${h.rtoHeadlineCount} (${h.rtoRatePct}%)   low-confidence excluded ${h.rtoLowCount}`);
-console.log(`  value at risk      INR ${Math.round(h.valueAtRisk).toLocaleString("en-IN")}`);
+console.log(`  value at risk      ${formatMoney(h.valueAtRisk, h.currency)}`);
 console.log(`  recovery           ${h.recoveredCount}/${h.eligibleForRecovery} = ${h.recoveryRatePct ?? "—"}%`);
 console.log(`  unknown carrier ${h.unknownCarrier}   unknown payment ${h.unknownPaymentMode}`);
 

@@ -4,7 +4,7 @@ import { Page, Card, DataTable, Badge, Text, BlockStack, Pagination, InlineStack
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { RTO_LABEL } from "../lib/inference/engine";
-import { formatINR } from "../lib/metrics";
+import { formatMoney, formatCount } from "../lib/metrics";
 import { carrierLabel } from "../lib/carriers";
 
 const PAGE = 50;
@@ -76,11 +76,11 @@ export default function Shipments() {
         </Badge>
       : "—",
     s.paymentMode,
-    formatINR(s.value, currency),
+    formatMoney(s.value, currency),
   ]);
 
   return (
-    <Page title="Shipments" subtitle={`${total.toLocaleString("en-IN")} shipments in the audit window`}>
+    <Page title="Shipments" subtitle={`${formatCount(total, currency)} shipments in the audit window`}>
       <Card>
         <BlockStack gap="300">
           <DataTable

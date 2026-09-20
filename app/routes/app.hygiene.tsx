@@ -6,6 +6,7 @@ import {
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { computeHygiene, HYGIENE_FORMULA } from "../lib/hygiene";
+import { formatDateTime } from "../lib/metrics";
 import { proposeCorrection, carrierLabel } from "../lib/carriers";
 import { applyTrackingCorrection } from "../lib/correction.server";
 
@@ -58,7 +59,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
     proposals: [...groups.values()],
     unrecognized: [...unrecognized.entries()].map(([name, count]) => ({ name, count })),
     writeLogs,
-    canWrite: Boolean(shop.scopes?.includes("write_fulfillments")),
+    timezone: shop.timezone,
+    currency: shop.currency,
+    // fulfillmentTrackingInfoUpdate needs a fulfillment-ORDER write scope; write_fulfillments
+    // is not sufficient and Shopify rejects the mutation outright. Gate on what actually works.
+    canWrite: Boolean(
+      shop.scopes?.includes("write_merchant_managed_fulfillment_orders") ||
+      shop.scopes?.includes("write_third_party_fulfillment_orders") ||
+      shop.scopes?.includes("write_assigned_fulfillment_orders"),
+    ),
   };
 }
 
@@ -79,7 +88,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Hygiene() {
-  const { report, proposals, unrecognized, writeLogs, canWrite } = useLoaderData<typeof loader>();
+  const { report, proposals, unrecognized, writeLogs, canWrite, timezone, currency } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
 
   const scoreTone = report.score >= 85 ? "success" : report.score >= 60 ? "attention" : "critical";
@@ -121,7 +130,7 @@ export default function Hygiene() {
             {!canWrite && (
               <Banner tone="warning" title="Write access not granted">
                 <Text as="p">
-                  The app does not have <code>write_fulfillments</code>. Corrections below are preview-only.
+                  The app does not have a fulfillment-order write scope, so Shopify will reject the tracking update. Corrections below are preview-only.
                 </Text>
               </Banner>
             )}
@@ -199,7 +208,7 @@ export default function Hygiene() {
                 columnContentTypes={["text", "text", "text", "text", "text"]}
                 headings={["When", "Target", "Before", "After", "Result"]}
                 rows={writeLogs.map((l) => [
-                  new Date(l.createdAt).toLocaleString("en-IN"),
+                  formatDateTime(l.createdAt as unknown as string, timezone, currency),
                   l.targetId,
                   JSON.stringify(l.beforeValue),
                   JSON.stringify(l.afterValue),

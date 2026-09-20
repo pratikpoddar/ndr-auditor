@@ -4,6 +4,7 @@ import {
   AppDistribution,
   shopifyApp,
 } from "@shopify/shopify-app-remix/server";
+import { billingConfig } from "./lib/billing";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 
@@ -31,6 +32,8 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
+  // Unlisted distribution still requires charges to go through Shopify Billing.
+  billing: billingConfig,
   // REST is gone entirely in shopify-app-remix v6; this app was GraphQL-only regardless.
   future: { unstable_newEmbeddedAuthStrategy: true },
   ...(process.env.SHOP_CUSTOM_DOMAIN ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] } : {}),

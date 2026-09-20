@@ -26,6 +26,11 @@ export default function Index() {
           Install
         </button>
       </form>
+      <p style={{ marginTop: 32, fontSize: 13, color: "#6d7175" }}>
+        <a href="/privacy" style={{ color: "#005bd3" }}>Privacy policy</a>
+        {" · "}
+        <a href="/support" style={{ color: "#005bd3" }}>Support</a>
+      </p>
     </main>
   );
 }

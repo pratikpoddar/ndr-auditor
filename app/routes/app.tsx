@@ -26,6 +26,7 @@ export default function App() {
         <Link to="/app/incidents">Recovery queue</Link>
         <Link to="/app/hygiene">Tracking hygiene</Link>
         <Link to="/app/shipments">Shipments</Link>
+        <Link to="/app/plan">Plan</Link>
         <Link to="/app/settings">Settings</Link>
       </NavMenu>
       <Outlet />

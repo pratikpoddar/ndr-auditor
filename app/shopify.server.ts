@@ -3,7 +3,6 @@ import {
   ApiVersion,
   AppDistribution,
   shopifyApp,
-  LATEST_API_VERSION,
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
@@ -11,14 +10,15 @@ import prisma from "./db.server";
 /**
  * Pinned API version.
  *
- * DAY-1 GATE: this is the newest stable version the installed @shopify/shopify-api client
- * knows about. Before writing any query against it, confirm against the live schema that
+ * Kept in lockstep with `api_version` under [webhooks] in shopify.app.toml — if the two drift,
+ * webhook payloads arrive in a different shape from the one the Admin client speaks.
+ *
+ * DAY-1 GATE: before writing any query against it, confirm against the live schema that
  * FulfillmentTrackingInfo, Fulfillment.events and fulfillmentTrackingInfoUpdate carry the
  * fields app/lib/shopify/queries.ts assumes. Bump deliberately, never implicitly — the
  * queries and the webhook payload shapes are versioned together.
  */
-export const API_VERSION = ApiVersion.October25;
-export const SDK_LATEST_API_VERSION = LATEST_API_VERSION;
+export const API_VERSION = ApiVersion.October26;
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY!,
@@ -29,7 +29,8 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
-  future: { unstable_newEmbeddedAuthStrategy: true, removeRest: true },
+  // REST is gone entirely in shopify-app-remix v6; this app was GraphQL-only regardless.
+  future: { unstable_newEmbeddedAuthStrategy: true },
   ...(process.env.SHOP_CUSTOM_DOMAIN ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] } : {}),
 });
 

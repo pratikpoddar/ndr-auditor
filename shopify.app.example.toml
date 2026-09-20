@@ -1,19 +1,13 @@
-# Template for shopify.app.toml, which is gitignored because `shopify app config link`
-# rewrites it with your own client_id, application_url and dev_store_url.
-#
-# Setup:
-#   cp shopify.app.example.toml shopify.app.toml
-#   npx shopify app config link      # fills in client_id and the URLs
-#
-# The scope and webhook choices below are product decisions, not boilerplate — keep them in
-# sync here when you change them, since this file is what a new contributor starts from.
-
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "762337243e2eb71d891b8398b8822417"
 name = "ndr-auditor"
 application_url = "https://shopify.dev/apps/default-app-home"
 embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
 
 [webhooks]
 api_version = "2026-10"
@@ -24,7 +18,3 @@ scopes = "read_fulfillments,read_orders,write_fulfillments"
 
 [auth]
 redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
-
-[build]
-include_config_on_deploy = true
-automatically_update_urls_on_dev = true

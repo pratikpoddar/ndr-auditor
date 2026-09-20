@@ -51,9 +51,12 @@ moves large numbers of shipments between confidence bands is visible immediately
 
 ## Also confirm against the pinned API version
 
-`API_VERSION` in `app/shopify.server.ts` is pinned to the newest stable version the installed
-`@shopify/shopify-api` client supports. Confirm every field in `app/lib/shopify/queries.ts`
-exists in that version's schema — fulfillment **event** shape is the most likely to differ. If a
+`API_VERSION` in `app/shopify.server.ts` is pinned to **2026-10**, and must stay in lockstep with
+`api_version` under `[webhooks]` in `shopify.app.toml`. If those two drift, webhook payloads
+arrive in a different shape from the one the Admin client speaks — which is exactly what happened
+on first link, when the CLI wrote 2026-10 against a client that only spoke 2025-10.
+
+Confirm every field in `app/lib/shopify/queries.ts` exists in that version's schema — fulfillment **event** shape is the most likely to differ. If a
 field is absent, delete it from the query rather than defending against it downstream.
 
 ## Go / no-go thresholds

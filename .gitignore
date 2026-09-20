@@ -8,3 +8,7 @@ node_modules
 .shopify
 *.log
 .DS_Store
+
+# Written by `shopify app config link` with a real client_id, tunnel URL and dev store.
+# Start from shopify.app.example.toml instead.
+shopify.app.toml

@@ -1,8 +1,8 @@
 # Deploying to Fly.io
 
 Two processes from one image: `web` (embedded app + webhook endpoint) and `worker` (drains the
-Postgres job queue). Primary region is `bom` (Mumbai) because the merchants and their stores
-are in India.
+Postgres job queue). Primary region is `sin` (Singapore), the closest Fly region to India at ~50-80ms. Fly no
+longer offers Mumbai (`bom`) — revisit if it returns.
 
 ## Why the web machine never scales to zero
 
@@ -17,7 +17,7 @@ detection latency would drift well past the two-minute target in the spec.
 export PATH="$HOME/.fly/bin:$PATH"
 fly auth login                      # browser
 fly apps create ndr-auditor
-fly postgres create --name ndr-auditor-db --region bom --initial-cluster-size 1 --vm-size shared-cpu-1x --volume-size 1
+fly postgres create --name ndr-auditor-db --org personal --region sin --initial-cluster-size 1 --vm-size shared-cpu-1x --volume-size 1
 fly postgres attach ndr-auditor-db --app ndr-auditor    # sets DATABASE_URL
 ```
 
@@ -63,6 +63,18 @@ Confirm in `shopify.app.toml` that `application_url` is the Fly domain, not a tu
 - [ ] Install on a dev store; confirm a `Shop` row, granted scopes, and `backfillState`
 - [ ] Fire a test webhook and confirm a `WebhookReceipt` row plus a drained job
 - [ ] Confirm the webhook endpoint rejects a bad HMAC with 401
+
+## Live deployment
+
+- App: https://ndr-auditor.fly.dev
+- Health: https://ndr-auditor.fly.dev/healthz
+- Database: `ndr-auditor-db` (unmanaged Fly Postgres, 1GB, sin)
+
+> **Unmanaged Postgres has no automatic backups and is not covered by Fly support.** That is
+> acceptable for a pilot whose data can be rebuilt by re-running the backfill from Shopify, but
+> set up snapshots or move to Fly Managed Postgres before any merchant depends on recovery of
+> recovery outcomes and merchant labels — those are the only rows that are NOT reconstructible
+> from Shopify.
 
 ## Cost
 

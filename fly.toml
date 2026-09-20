@@ -10,7 +10,8 @@
 # NDR detection inside the spec's two-minute target.
 
 app = "ndr-auditor"
-primary_region = "bom"   # Mumbai: the merchants and their Shopify stores are in India.
+primary_region = "sin"   # Singapore: closest Fly region to India (~50-80ms). Fly no longer
+                         # offers Mumbai (bom). Revisit if they bring it back.
 
 [build]
   dockerfile = "Dockerfile"

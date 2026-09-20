@@ -22,7 +22,8 @@
     "lint": "eslint app prisma tests --ext .ts,.tsx",
     "verify": "tsx scripts/verify-integrity.ts",
     "reinfer": "tsx scripts/reinfer.ts",
-    "demo:token": "tsx scripts/demo-token.ts"
+    "demo:token": "tsx scripts/demo-token.ts",
+    "day1": "tsx scripts/day1-gate.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

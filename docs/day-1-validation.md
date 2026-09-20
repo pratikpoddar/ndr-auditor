@@ -13,6 +13,22 @@ Shopify has no native RTO field and no standard NDR reason code. This product in
 inference is only as good as the evidence Shopify actually receives from Indian couriers and
 aggregators, and that varies per store. Assume nothing; measure it.
 
+## Run the gate
+
+```bash
+npm run day1 -- <shop-domain>.myshopify.com        # live sample from Shopify
+npm run day1 -- <shop-domain>.myshopify.com --from-db   # re-analyse ingested data, no API calls
+```
+
+Writes `day1-report-<store>-<date>.md` — the one-page report this gate requires, with exact
+denominators. The section that matters is **"exception messages the dictionary does not
+understand"**: every row there is a phrase a real courier wrote that the app currently shows as
+"Reason unknown". Fix those in `app/lib/inference/reasons.ts`, bump `RULE_VERSION`, and run
+`npm run reinfer` to re-derive every stored incident with no API cost.
+
+`--from-db` makes this repeatable: run it after every dictionary change to watch the unexplained
+count fall.
+
 ## Checklist
 
 Record the answers in the table below. Do not skip a row because it "obviously" works.

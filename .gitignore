@@ -12,3 +12,4 @@ node_modules
 # Written by `shopify app config link` with a real client_id, tunnel URL and dev store.
 # Start from shopify.app.toml.example instead.
 shopify.app.toml
+day1-report-*.md
